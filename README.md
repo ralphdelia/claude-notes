@@ -1,15 +1,19 @@
-# test
+# Notes MCP Server
 
-To install dependencies:
+A Model Context Protocol (MCP) server that saves information to a notes folder using Claude Code.
+
+## Setup
 
 ```bash
 bun install
+npm run build
 ```
 
-To run:
+## Usage
 
+Run as MCP server:
 ```bash
-bun run index.ts
+./build/index.js [-d /path/to/notes]
 ```
 
-This project was created using `bun init` in bun v1.2.1. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+The server provides a `save` tool that processes information through Claude Code and saves it to the specified directory (defaults to `./vault`).
