@@ -5,10 +5,16 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { parseArgs } from "util";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { z } from "zod";
 import { query, type SDKMessage } from "@anthropic-ai/claude-code";
-import savePrompt from "./savePrompt.txt";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+
+const savePrompt = readFileSync(resolve(__dirname, "savePrompt.txt"), "utf-8");
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -20,7 +26,18 @@ const { values } = parseArgs({
   },
 });
 
-export const OUT_DIR = values.d ? resolve(values.d) : process.cwd();
+export const OUT_DIR = values.d
+  ? resolve(values.d)
+  : resolve(__dirname, "..", "vault");
+export const LOG_DIR = resolve(__dirname, "..", "logs");
+
+// Ensure directories exist
+if (!existsSync(OUT_DIR)) {
+  mkdirSync(OUT_DIR, { recursive: true });
+}
+if (!existsSync(LOG_DIR)) {
+  mkdirSync(LOG_DIR, { recursive: true });
+}
 
 // Create the MCP server
 const server = new Server(
@@ -65,31 +82,82 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-// Implement the tool handler
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "save") {
+    const timestamp = new Date().toISOString();
+    const logId = `save_${timestamp.replace(/[:.]/g, "-")}`;
+    let logData = {
+      id: logId,
+      timestamp,
+      request: request.params,
+      outDir: OUT_DIR,
+      success: false,
+      error: null as any,
+      messages: [] as SDKMessage[],
+      duration: 0,
+    };
+
+    const startTime = Date.now();
+
     try {
       const args = saveToolSchema.parse(request.params.arguments);
+      logData.request = { ...request.params, arguments: args };
 
       const messages: SDKMessage[] = [];
+      let hasResult = false;
 
-      for await (const message of query({
-        prompt: savePrompt + `Information to be saved: ${args.info}`,
-        options: {
-          cwd: OUT_DIR,
-        },
-      }));
+      try {
+        for await (const message of query({
+          prompt: savePrompt + `Information to be saved: ${args.info}`,
+          options: {
+            cwd: OUT_DIR,
+            maxTurns: 5,
+            executable: "node",
+            permissionMode: "bypassPermissions",
+          },
+        })) {
+          messages.push(message);
+          if (message.type === "result") {
+            hasResult = true;
+            break;
+          }
+        }
+      } catch (queryError) {
+        // Check if this is a normal completion (has messages and result) vs startup failure (no messages)
+        if (
+          hasResult &&
+          messages.length > 0 &&
+          queryError instanceof Error &&
+          queryError.message.includes("exited with code 1")
+        ) {
+          // Normal completion with exit code 1 after processing
+        } else {
+          // This is a real error - either startup failure or other issue
+          throw new Error(
+            `Claude Code SDK error: ${queryError instanceof Error ? queryError.message : "Unknown error"}. Check ANTHROPIC_API_KEY and permissions.`,
+          );
+        }
+      }
+
+      logData.messages = messages;
+      logData.success = true;
+      logData.duration = Date.now() - startTime;
 
       return {
         content: [
           {
             type: "text",
-            text: `Data saved successfully to ${OUT_DIR}. Result: ${JSON.stringify(messages)}`,
+            text: `Data saved successfully to ${OUT_DIR}`,
           },
         ],
       };
     } catch (error) {
-      console.error("Error in save tool:", error);
+      logData.error = {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : "UnknownError",
+      };
+      logData.duration = Date.now() - startTime;
 
       return {
         isError: true,
@@ -100,6 +168,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         ],
       };
+    } finally {
+      const logFile = resolve(LOG_DIR, `${logId}.json`);
+      writeFileSync(logFile, JSON.stringify(logData, null, 2));
     }
   }
 
@@ -123,5 +194,4 @@ async function main() {
 
 main().catch((err) => {
   console.error("Fatal error:", err);
-  process.exit(1);
 });
