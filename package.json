@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.44",
     "@modelcontextprotocol/sdk": "^1.15.0",
+    "dotenv": "^17.2.0",
     "zod": "^3.23.0"
   }
 }

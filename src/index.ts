@@ -13,6 +13,15 @@ const __dirname = dirname(__filename);
 import { z } from "zod";
 import { query, type SDKMessage } from "@anthropic-ai/claude-code";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { config } from "dotenv";
+
+// Load environment variables from .env file
+config({ path: resolve(__dirname, "..", ".env") });
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.log(process.env.ANTHROPIC_API_KEY);
+  throw new Error("error");
+}
 
 const savePrompt = readFileSync(resolve(__dirname, "savePrompt.txt"), "utf-8");
 
@@ -104,38 +113,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       logData.request = { ...request.params, arguments: args };
 
       const messages: SDKMessage[] = [];
-      let hasResult = false;
 
-      try {
-        for await (const message of query({
-          prompt: savePrompt + `Information to be saved: ${args.info}`,
-          options: {
-            cwd: OUT_DIR,
-            maxTurns: 5,
-            executable: "node",
-            permissionMode: "bypassPermissions",
-          },
-        })) {
-          messages.push(message);
-          if (message.type === "result") {
-            hasResult = true;
-            break;
-          }
-        }
-      } catch (queryError) {
-        // Check if this is a normal completion (has messages and result) vs startup failure (no messages)
-        if (
-          hasResult &&
-          messages.length > 0 &&
-          queryError instanceof Error &&
-          queryError.message.includes("exited with code 1")
-        ) {
-          // Normal completion with exit code 1 after processing
-        } else {
-          // This is a real error - either startup failure or other issue
-          throw new Error(
-            `Claude Code SDK error: ${queryError instanceof Error ? queryError.message : "Unknown error"}. Check ANTHROPIC_API_KEY and permissions.`,
-          );
+      for await (const message of query({
+        prompt: savePrompt + `Information to be saved: ${args.info}`,
+        options: {
+          cwd: OUT_DIR,
+          permissionMode: "acceptEdits",
+          // maxTurns: 5,
+          executable: "bun",
+        },
+      })) {
+        messages.push(message);
+        if (message.type === "result") {
+          break;
         }
       }
 
