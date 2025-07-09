@@ -15,7 +15,6 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-code";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { config } from "dotenv";
 
-// Load environment variables from .env file
 config({ path: resolve(__dirname, "..", ".env") });
 
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -40,7 +39,6 @@ export const OUT_DIR = values.d
   : resolve(__dirname, "..", "vault");
 export const LOG_DIR = resolve(__dirname, "..", "logs");
 
-// Ensure directories exist
 if (!existsSync(OUT_DIR)) {
   mkdirSync(OUT_DIR, { recursive: true });
 }
@@ -48,7 +46,6 @@ if (!existsSync(LOG_DIR)) {
   mkdirSync(LOG_DIR, { recursive: true });
 }
 
-// Create the MCP server
 const server = new Server(
   {
     name: "notes-server",
@@ -61,14 +58,12 @@ const server = new Server(
   },
 );
 
-// Define tool schema using zod
 const saveToolSchema = z.object({
   info: z
     .string()
     .describe("Information that to be saved to the notes folder."),
 });
 
-// Register tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -119,7 +114,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         options: {
           cwd: OUT_DIR,
           permissionMode: "acceptEdits",
-          // maxTurns: 5,
           executable: "bun",
         },
       })) {
@@ -175,7 +169,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   };
 });
 
-// Connect the transport
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
