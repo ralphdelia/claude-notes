@@ -1,0 +1,22 @@
+{
+  "name": "test",
+  "module": "index.ts",
+  "type": "module",
+  "bin": {
+    "notes-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.44",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "zod": "^3.23.0"
+  }
+}
