@@ -4,16 +4,20 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+
 import { parseArgs } from "util";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
+import { z } from "zod";
+import { query } from "@anthropic-ai/claude-code";
+import { readFileSync, mkdirSync, existsSync } from "fs";
+import { config } from "dotenv";
+
+import { OperationLogger } from "./logging.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import { z } from "zod";
-import { query, type SDKMessage } from "@anthropic-ai/claude-code";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
-import { config } from "dotenv";
 
 config({ path: resolve(__dirname, "..", ".env") });
 
@@ -88,26 +92,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "save") {
-    const timestamp = new Date().toISOString();
-    const logId = `save_${timestamp.replace(/[:.]/g, "-")}`;
-    let logData = {
-      id: logId,
-      timestamp,
-      request: request.params,
-      outDir: OUT_DIR,
-      success: false,
-      error: null as any,
-      messages: [] as SDKMessage[],
-      duration: 0,
-    };
-
-    const startTime = Date.now();
+    const logger = new OperationLogger("save", request.params, LOG_DIR);
 
     try {
       const args = saveToolSchema.parse(request.params.arguments);
-      logData.request = { ...request.params, arguments: args };
-
-      const messages: SDKMessage[] = [];
 
       for await (const message of query({
         prompt: savePrompt + `Information to be saved: ${args.info}`,
@@ -117,16 +105,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           executable: "bun",
         },
       })) {
-        messages.push(message);
+        logger.addMessage(message);
         if (message.type === "result") {
           break;
         }
       }
 
-      logData.messages = messages;
-      logData.success = true;
-      logData.duration = Date.now() - startTime;
-
+      logger.setSuccess();
       return {
         content: [
           {
@@ -136,13 +121,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
     } catch (error) {
-      logData.error = {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : "UnknownError",
-      };
-      logData.duration = Date.now() - startTime;
-
+      logger.setError(error);
       return {
         isError: true,
         content: [
@@ -153,8 +132,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
     } finally {
-      const logFile = resolve(LOG_DIR, `${logId}.json`);
-      writeFileSync(logFile, JSON.stringify(logData, null, 2));
+      await logger.flush().catch(console.error);
     }
   }
 
