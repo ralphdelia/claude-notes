@@ -9,8 +9,10 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { config } from "dotenv";
 
-import { handleSaveTool } from "./saveHandler.js";
-import { OUT_DIR, LOG_DIR } from "./config.js";
+import { handleSaveTool, saveToolDefinition } from "./tools/save.js";
+import { handleListTool, listToolDefinition } from "./tools/list.js";
+import { handleReadTool, readToolDefinition } from "./tools/read.js";
+import { OUT_DIR } from "./config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,39 +42,32 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      {
-        name: "save",
-        description:
-          "A function that will save important information into the notes folder",
-        inputSchema: {
-          type: "object",
-          properties: {
-            info: {
-              type: "string",
-              description: "Information that to be saved to the notes folder.",
-            },
-          },
-          required: ["info"],
-        },
-      },
+      saveToolDefinition,
+      listToolDefinition,
+      readToolDefinition,
     ],
   };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === "save") {
-    return await handleSaveTool(request.params, OUT_DIR, LOG_DIR);
+  switch (request.params.name) {
+    case "save":
+      return await handleSaveTool(request.params, OUT_DIR);
+    case "list":
+      return await handleListTool(request.params, OUT_DIR);
+    case "read":
+      return await handleReadTool(request.params, OUT_DIR);
+    default:
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Unknown tool: ${request.params.name}`,
+          },
+        ],
+      };
   }
-
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text",
-        text: `Unknown tool: ${request.params.name}`,
-      },
-    ],
-  };
 });
 
 async function main() {

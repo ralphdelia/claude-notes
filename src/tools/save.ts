@@ -4,7 +4,8 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-import { OperationLogger } from "./logging.js";
+import { OperationLogger } from "../logging.js";
+import { LOG_DIR } from "../config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,8 +18,23 @@ const saveToolSchema = z.object({
     .describe("Information that to be saved to the notes folder."),
 });
 
-export async function handleSaveTool(request: any, outDir: string, logDir: string) {
-  const logger = new OperationLogger("save", request, logDir);
+export const saveToolDefinition = {
+  name: "save",
+  description: "A function that will save important information into the notes folder",
+  inputSchema: {
+    type: "object",
+    properties: {
+      info: {
+        type: "string",
+        description: "Information that to be saved to the notes folder.",
+      },
+    },
+    required: ["info"],
+  },
+};
+
+export async function handleSaveTool(request: any, outDir: string) {
+  const logger = new OperationLogger("save", request, LOG_DIR);
   
   try {
     const args = saveToolSchema.parse(request.arguments);

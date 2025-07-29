@@ -6,7 +6,7 @@
     "notes-server": "./build/index.js"
   },
   "scripts": {
-    "build": "tsc && cp src/savePrompt.txt build/ && chmod +x build/index.js"
+    "build": "tsc && mkdir -p build/tools && cp src/tools/savePrompt.txt build/tools/ && chmod +x build/index.js"
   },
   "devDependencies": {
     "@types/bun": "latest"
