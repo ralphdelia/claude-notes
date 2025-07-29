@@ -1,6 +1,8 @@
 import { resolve } from "path";
-import { writeFile } from "fs/promises";
+import { writeFile, readdir, unlink, stat } from "fs/promises";
 import { type SDKMessage } from "@anthropic-ai/claude-code";
+
+const MAX_LOG_FILES = 10;
 
 interface LogEntry {
   id: string;
@@ -27,7 +29,7 @@ export class OperationLogger {
     this.startTime = Date.now();
     this.logDir = logDir;
     this.logData = {
-      id: `${operation}_${timestamp.replace(/[:.]/g, "-")}`,
+      id: `${timestamp.replace(/[:.]/g, "-")}_${operation}`,
       timestamp,
       operation,
       request,
@@ -59,5 +61,41 @@ export class OperationLogger {
   async flush(): Promise<void> {
     const logFile = resolve(this.logDir, `${this.logData.id}.json`);
     await writeFile(logFile, JSON.stringify(this.logData, null, 2));
+
+    // Clean up old log files to maintain the maximum count
+    await this.cleanupOldLogs();
+  }
+
+  private async cleanupOldLogs(): Promise<void> {
+    try {
+      const files = await readdir(this.logDir);
+      const logFiles = files
+        .filter((file) => file.endsWith(".json"))
+        .map((file) => resolve(this.logDir, file));
+
+      if (logFiles.length <= MAX_LOG_FILES) {
+        return; // No cleanup needed
+      }
+
+      const fileStats = await Promise.all(
+        logFiles.map(async (file) => ({
+          path: file,
+          mtime: (await stat(file)).mtime,
+        })),
+      );
+
+      fileStats.sort((a, b) => a.mtime.getTime() - b.mtime.getTime());
+
+      const filesToDelete = fileStats.slice(
+        0,
+        fileStats.length - MAX_LOG_FILES,
+      );
+
+      await Promise.all(
+        filesToDelete.map(({ path }) => unlink(path).catch(() => {})),
+      );
+    } catch (error) {
+      console.error("Log cleanup failed:", error);
+    }
   }
 }
