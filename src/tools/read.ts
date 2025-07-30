@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 
 import { OperationLogger } from "../logging.js";
-import { LOG_DIR } from "../config.js";
+import { LOG_DIR, OUT_DIR } from "../config.js";
 
 const readToolSchema = z.object({
   path: z.string().describe("Path to the file within the vault to read"),
@@ -24,16 +24,16 @@ export const readToolDefinition = {
   },
 };
 
-export async function handleReadTool(request: any, outDir: string) {
+export async function handleReadTool(request: any) {
   const logger = new OperationLogger("read", request, LOG_DIR);
 
   try {
     const args = readToolSchema.parse(request.arguments);
 
     const filePath = args.path.endsWith(".md") ? args.path : `${args.path}.md`;
-    const fullPath = resolve(join(outDir, filePath));
+    const fullPath = resolve(join(OUT_DIR, filePath));
 
-    const normalizedOutDir = resolve(outDir);
+    const normalizedOutDir = resolve(OUT_DIR);
     if (!fullPath.startsWith(normalizedOutDir)) {
       throw new Error("Access denied: Path is outside the vault directory");
     }

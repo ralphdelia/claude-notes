@@ -3,7 +3,7 @@ import { readdirSync, statSync } from "fs";
 import { join, relative } from "path";
 
 import { OperationLogger } from "../logging.js";
-import { LOG_DIR } from "../config.js";
+import { LOG_DIR, OUT_DIR } from "../config.js";
 
 const listToolSchema = z.object({
   path: z
@@ -31,8 +31,8 @@ export const listToolDefinition = {
 function listFilesRecursively(
   dirPath: string,
   basePath: string,
-): Array<{ path: string; type: string; size?: number }> {
-  const items: Array<{ path: string; type: string; size?: number }> = [];
+): Array<{ path: string; type: string }> {
+  const items: Array<{ path: string; type: string }> = [];
 
   try {
     const entries = readdirSync(dirPath);
@@ -49,7 +49,6 @@ function listFilesRecursively(
         items.push({
           path: relativePath,
           type: "file",
-          size: stats.size,
         });
       }
     }
@@ -58,21 +57,20 @@ function listFilesRecursively(
   return items;
 }
 
-export async function handleListTool(request: any, outDir: string) {
+export async function handleListTool(request: any) {
   const logger = new OperationLogger("list", request, LOG_DIR);
 
   try {
     const args = listToolSchema.parse(request.arguments);
-    const targetPath = args.path ? join(outDir, args.path) : outDir;
+    const targetPath = args.path ? join(OUT_DIR, args.path) : OUT_DIR;
 
-    const items = listFilesRecursively(targetPath, outDir);
+    const items = listFilesRecursively(targetPath, OUT_DIR);
 
     const formattedItems = items.map((item) => {
       if (item.type === "directory") {
         return `📁 ${item.path}/`;
       } else {
-        const sizeKB = item.size ? Math.round(item.size / 1024) : 0;
-        return `📄 ${item.path} (${sizeKB}KB)`;
+        return `📄 ${item.path}`;
       }
     });
 

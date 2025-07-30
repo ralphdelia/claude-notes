@@ -52,11 +52,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (request.params.name) {
     case "save":
-      return await handleSaveTool(request.params, OUT_DIR);
+      return await handleSaveTool(request.params);
     case "list":
-      return await handleListTool(request.params, OUT_DIR);
+      return await handleListTool(request.params);
     case "read":
-      return await handleReadTool(request.params, OUT_DIR);
+      return await handleReadTool(request.params);
     default:
       return {
         isError: true,

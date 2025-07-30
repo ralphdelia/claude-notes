@@ -5,7 +5,7 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 import { OperationLogger } from "../logging.js";
-import { LOG_DIR } from "../config.js";
+import { LOG_DIR, OUT_DIR } from "../config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,7 +33,7 @@ export const saveToolDefinition = {
   },
 };
 
-export async function handleSaveTool(request: any, outDir: string) {
+export async function handleSaveTool(request: any) {
   const logger = new OperationLogger("save", request, LOG_DIR);
   
   try {
@@ -42,7 +42,7 @@ export async function handleSaveTool(request: any, outDir: string) {
     for await (const message of query({
       prompt: savePrompt + `Information to be saved: ${args.info}`,
       options: {
-        cwd: outDir,
+        cwd: OUT_DIR,
         permissionMode: "acceptEdits",
         executable: "bun",
       },
@@ -58,7 +58,7 @@ export async function handleSaveTool(request: any, outDir: string) {
       content: [
         {
           type: "text",
-          text: `Data saved successfully to ${outDir}`,
+          text: `Data saved successfully to ${OUT_DIR}`,
         },
       ],
     };
